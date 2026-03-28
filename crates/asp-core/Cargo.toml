@@ -1,0 +1,18 @@
+[package]
+name = "asp-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+asp-db = { path = "../asp-db" }
+asp-parser = { path = "../asp-parser" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+sha2 = { workspace = true }
+globset = { workspace = true }
+ignore = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+rusqlite = { workspace = true }

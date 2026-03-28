@@ -1,0 +1,9 @@
+[package]
+name = "asp-db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+rusqlite = { workspace = true }
+tracing = { workspace = true }

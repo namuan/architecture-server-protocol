@@ -1,0 +1,52 @@
+[project]
+name = "asp"
+languages = ["rust"]
+version = "1"
+
+[[component]]
+name = "cli"
+description = "CLI entrypoint and command definitions"
+paths = ["crates/asp-cli/**"]
+
+[[component]]
+name = "core"
+description = "Indexer, resolver, manifest and component matching"
+paths = ["crates/asp-core/**"]
+
+[[component]]
+name = "db"
+description = "SQLite wrapper, schema and migrations"
+paths = ["crates/asp-db/**"]
+
+[[component]]
+name = "llm"
+description = "LLM abstraction layer and OpenAI-compatible client"
+paths = ["crates/asp-llm/**"]
+
+[[component]]
+name = "parser"
+description = "Tree-sitter wrapper and per-language query registration"
+paths = ["crates/asp-parser/**"]
+
+[[component]]
+name = "rules"
+description = "Rule engine, violation detection and cycle detection"
+paths = ["crates/asp-rules/**"]
+
+[[component]]
+name = "watcher"
+description = "File watcher and debounce logic"
+paths = ["crates/asp-watcher/**"]
+
+[[component]]
+name = "daemon"
+description = "Tokio runtime and JSON-RPC Unix socket"
+paths = ["crates/asp-daemon/**"]
+
+[[rule]]
+name = "no-cycles"
+type = "no_cycles"
+
+[[rule]]
+name = "no-unowned"
+type = "no_unowned"

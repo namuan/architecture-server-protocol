@@ -1,0 +1,12 @@
+[package]
+name = "asp-rules"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+asp-core = { path = "../asp-core" }
+asp-db = { path = "../asp-db" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
