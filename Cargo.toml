@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "crates/asp-cli",
+    "crates/asp-core",
+    "crates/asp-db",
+    "crates/asp-llm",
+    "crates/asp-parser",
+    "crates/asp-rules",
+    "crates/asp-watcher",
+    "crates/asp-daemon",
+    "tests",
+]
+resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["stream", "json"] }
+async-trait = "0.1"
+sha2 = "0.10"
+globset = "0.4"
+ignore = "0.4"
+notify = "6"
+git2 = "0.19"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures = "0.3"

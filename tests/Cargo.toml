@@ -1,0 +1,30 @@
+[package]
+name = "asp-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[test]]
+name = "parser_tests"
+path = "parser_tests.rs"
+
+[[test]]
+name = "resolver_tests"
+path = "resolver_tests.rs"
+
+[[test]]
+name = "rules_tests"
+path = "rules_tests.rs"
+
+[[test]]
+name = "indexer_tests"
+path = "indexer_tests.rs"
+
+[dev-dependencies]
+asp-core = { path = "../crates/asp-core" }
+asp-db = { path = "../crates/asp-db" }
+asp-parser = { path = "../crates/asp-parser" }
+asp-rules = { path = "../crates/asp-rules" }
+anyhow = { workspace = true }
+
+[dependencies]
