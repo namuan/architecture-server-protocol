@@ -51,6 +51,7 @@ enum Commands {
 }
 
 #[derive(serde::Deserialize, Default)]
+#[allow(dead_code)]
 struct GlobalConfig {
     #[serde(default)]
     llm: LlmConfig,
@@ -76,6 +77,7 @@ impl Default for LlmConfig {
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct StalenessConfig {
     threshold: f64,
 }
