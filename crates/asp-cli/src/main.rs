@@ -22,6 +22,9 @@ enum Commands {
         /// Print each step: DB path, indexed counts, detected languages, discovered components, and (with --yes) LLM prompts and responses
         #[arg(long, short)]
         verbose: bool,
+        /// Delete the existing index and architecture.toml before initializing
+        #[arg(long)]
+        refresh: bool,
     },
     /// Print component dependency graph
     Graph {
@@ -54,6 +57,8 @@ enum Commands {
     },
     /// Print current state of the index
     Status,
+    /// Delete the index database for the current project
+    Clean,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -132,7 +137,10 @@ async fn main() -> Result<()> {
     let config = load_global_config();
 
     match cli.command {
-        Commands::Init { project_root, yes, verbose } => {
+        Commands::Init { project_root, yes, verbose, refresh } => {
+            if refresh {
+                cmd_clean_project(&project_root)?;
+            }
             cmd_init(project_root, yes, verbose, &config).await?;
         }
         Commands::Graph { format } => {
@@ -152,6 +160,9 @@ async fn main() -> Result<()> {
         }
         Commands::Status => {
             cmd_status()?;
+        }
+        Commands::Clean => {
+            cmd_clean()?;
         }
     }
 
@@ -366,8 +377,16 @@ fn cmd_graph(format: &str) -> Result<()> {
         return Ok(());
     }
 
+    let arch_toml = project_root.join("architecture.toml");
+    let config = if arch_toml.exists() {
+        asp_core::AspConfig::load(&arch_toml)?
+    } else {
+        asp_core::AspConfig::default()
+    };
+
     let db = asp_db::Database::open(db_path.to_str().unwrap_or(":memory:"))?;
     let resolver = asp_core::Resolver::new(&db);
+    resolver.assign_components(&config)?;
     let graph = resolver.component_dependency_graph()?;
 
     match format {
@@ -523,6 +542,8 @@ fn cmd_check(rule_filter: Option<&str>, format: &str) -> Result<()> {
     };
 
     let db = asp_db::Database::open(db_path.to_str().unwrap_or(":memory:"))?;
+    let resolver = asp_core::Resolver::new(&db);
+    resolver.assign_components(&config)?;
     let engine = asp_rules::RuleEngine::new(&db, &config);
     let mut violations = engine.check_all()?;
 
@@ -796,6 +817,33 @@ fn cmd_status() -> Result<()> {
     println!("  Imports:        {}", import_count);
     println!("  Symbols:        {}", symbol_count);
     println!("  DB:             {}", db_path.display());
+
+    Ok(())
+}
+
+fn cmd_clean() -> Result<()> {
+    let project_root = PathBuf::from(".");
+    cmd_clean_project(&project_root)
+}
+
+fn cmd_clean_project(project_root: &PathBuf) -> Result<()> {
+    let db_path = project_db_path(project_root);
+    let arch_toml = project_root.join("architecture.toml");
+
+    if !db_path.exists() && !arch_toml.exists() {
+        println!("Nothing to clean.");
+        return Ok(());
+    }
+
+    if db_path.exists() {
+        std::fs::remove_file(&db_path)?;
+        println!("Removed {}", db_path.display());
+    }
+
+    if arch_toml.exists() {
+        std::fs::remove_file(&arch_toml)?;
+        println!("Removed {}", arch_toml.display());
+    }
 
     Ok(())
 }

@@ -27,7 +27,10 @@ impl Indexer {
 
         let content = std::fs::read(path)?;
         let hash = compute_hash(&content);
-        let path_str = path.to_string_lossy().to_string();
+        let path_str = path.canonicalize()
+            .unwrap_or_else(|_| path.to_path_buf())
+            .to_string_lossy()
+            .into_owned();
 
         let existing_hash: Option<String> = self.db.conn
             .query_row(

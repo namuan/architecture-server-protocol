@@ -1,5 +1,6 @@
 use anyhow::Result;
 use asp_db::Database;
+use globset::{Glob, GlobSetBuilder};
 use std::collections::{HashMap, HashSet};
 
 pub struct Resolver<'a> {
@@ -28,6 +29,49 @@ impl<'a> Resolver<'a> {
         }
 
         Ok(graph)
+    }
+
+    /// Match every indexed file against the component glob patterns from `architecture.toml`
+    /// and update the `component` column in the DB accordingly.
+    pub fn assign_components(&self, config: &crate::AspConfig) -> Result<()> {
+        // Reset all assignments so removed/renamed components don't linger.
+        self.db.conn.execute("UPDATE files SET component = NULL", [])?;
+
+        for component in &config.component {
+            let mut builder = GlobSetBuilder::new();
+            for pattern in &component.paths {
+                if let Ok(g) = Glob::new(pattern) {
+                    builder.add(g);
+                }
+            }
+            let Ok(globset) = builder.build() else { continue };
+
+            // Fetch all file paths, then match and update in Rust (avoids SQL LIKE limitations).
+            let mut stmt = self.db.conn.prepare("SELECT path FROM files")?;
+            let paths: Vec<String> = stmt
+                .query_map([], |row| row.get(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            for path in paths {
+                // Match against just the portion after any leading path separator so
+                // patterns like "Sources/**" work regardless of absolute prefix.
+                let match_target = std::path::Path::new(&path)
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/");
+
+                if globset.is_match(&match_target) || globset.is_match(&path) {
+                    self.db.conn.execute(
+                        "UPDATE files SET component = ?1 WHERE path = ?2",
+                        rusqlite::params![component.name, path],
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn component_for_file(&self, file_path: &str) -> Result<Option<String>> {
