@@ -19,6 +19,9 @@ enum Commands {
         project_root: PathBuf,
         #[arg(long)]
         yes: bool,
+        /// Print each step: DB path, indexed counts, detected languages, discovered components, and (with --yes) LLM prompts and responses
+        #[arg(long, short)]
+        verbose: bool,
     },
     /// Print component dependency graph
     Graph {
@@ -45,6 +48,9 @@ enum Commands {
     Refresh {
         #[arg(long)]
         force: bool,
+        /// Print LLM endpoint, per-component context sent, and raw responses received
+        #[arg(long, short)]
+        verbose: bool,
     },
     /// Print current state of the index
     Status,
@@ -126,8 +132,8 @@ async fn main() -> Result<()> {
     let config = load_global_config();
 
     match cli.command {
-        Commands::Init { project_root, yes } => {
-            cmd_init(project_root, yes, &config).await?;
+        Commands::Init { project_root, yes, verbose } => {
+            cmd_init(project_root, yes, verbose, &config).await?;
         }
         Commands::Graph { format } => {
             cmd_graph(&format)?;
@@ -141,8 +147,8 @@ async fn main() -> Result<()> {
         Commands::Watch { format } => {
             cmd_watch(&format)?;
         }
-        Commands::Refresh { force } => {
-            cmd_refresh(force, &config).await?;
+        Commands::Refresh { force, verbose } => {
+            cmd_refresh(force, verbose, &config).await?;
         }
         Commands::Status => {
             cmd_status()?;
@@ -152,19 +158,51 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn cmd_init(project_root: PathBuf, yes: bool, config: &GlobalConfig) -> Result<()> {
+async fn cmd_init(project_root: PathBuf, yes: bool, verbose: bool, config: &GlobalConfig) -> Result<()> {
     println!("Initializing ASP for {:?}", project_root);
 
     std::fs::create_dir_all(dirs_home().join(".asp"))?;
     let db_path = project_db_path(&project_root);
-    let db = asp_db::Database::open(db_path.to_str().unwrap_or(":memory:"))?;
+    if verbose {
+        println!("  db: {}", db_path.display());
+        println!("  indexing {}...", project_root.display());
+    }
 
+    let db = asp_db::Database::open(db_path.to_str().unwrap_or(":memory:"))?;
     let indexer = asp_core::Indexer::new(db, project_root.clone());
     indexer.index_directory(&project_root)?;
 
+    if verbose {
+        let files: i64 = indexer.db.conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0)).unwrap_or(0);
+        let imports: i64 = indexer.db.conn.query_row("SELECT COUNT(*) FROM imports", [], |r| r.get(0)).unwrap_or(0);
+        let symbols: i64 = indexer.db.conn.query_row("SELECT COUNT(*) FROM symbols", [], |r| r.get(0)).unwrap_or(0);
+        println!("  indexed {} file(s), {} import(s), {} symbol(s)", files, imports, symbols);
+    }
+
     let arch_toml = project_root.join("architecture.toml");
     if !arch_toml.exists() {
-        let asp_config = scaffold_config(&project_root);
+        let name = detect_project_name(&project_root);
+        let languages = detect_languages(&project_root);
+        let components = discover_components(&project_root);
+
+        if verbose {
+            println!("  project name: {}", name);
+            println!("  languages: {}", if languages.is_empty() { "(none detected)".to_string() } else { languages.join(", ") });
+            println!("  components ({}):", components.len());
+            for c in &components {
+                println!("    {} -> {}", c.name, c.paths.join(", "));
+            }
+            println!("  writing {}...", arch_toml.display());
+        }
+
+        let asp_config = asp_core::AspConfig {
+            project: asp_core::Project { name, languages, version: "1".to_string() },
+            component: components,
+            rule: vec![
+                asp_core::Rule { name: "no_cycles".to_string(), rule_type: "no_cycles".to_string(), config: Default::default() },
+                asp_core::Rule { name: "no_unowned".to_string(), rule_type: "no_unowned".to_string(), config: Default::default() },
+            ],
+        };
         let n = asp_config.component.len();
         asp_config.save(&arch_toml)?;
         if n > 0 {
@@ -178,42 +216,11 @@ async fn cmd_init(project_root: PathBuf, yes: bool, config: &GlobalConfig) -> Re
 
     if yes {
         println!("Generating LLM descriptions for components (--yes)...");
-        run_refresh(&project_root, false, config).await?;
+        run_refresh(&project_root, false, verbose, config).await?;
     }
 
     println!("Done.");
     Ok(())
-}
-
-/// Build a starter `AspConfig` by inspecting the directory tree:
-/// - project name from `Cargo.toml` / `package.json` / directory basename
-/// - languages from file extensions actually present
-/// - components from meaningful subdirectory boundaries
-fn scaffold_config(project_root: &Path) -> asp_core::AspConfig {
-    let name = detect_project_name(project_root);
-    let languages = detect_languages(project_root);
-    let components = discover_components(project_root);
-
-    asp_core::AspConfig {
-        project: asp_core::Project {
-            name,
-            languages,
-            version: "1".to_string(),
-        },
-        component: components,
-        rule: vec![
-            asp_core::Rule {
-                name: "no_cycles".to_string(),
-                rule_type: "no_cycles".to_string(),
-                config: Default::default(),
-            },
-            asp_core::Rule {
-                name: "no_unowned".to_string(),
-                rule_type: "no_unowned".to_string(),
-                config: Default::default(),
-            },
-        ],
-    }
 }
 
 /// Try Cargo.toml `[package] name`, then package.json `name`, then the directory basename.
@@ -569,13 +576,13 @@ fn cmd_watch(format: &str) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_refresh(force: bool, config: &GlobalConfig) -> Result<()> {
+async fn cmd_refresh(force: bool, verbose: bool, config: &GlobalConfig) -> Result<()> {
     let project_root = PathBuf::from(".");
-    run_refresh(&project_root, force, config).await
+    run_refresh(&project_root, force, verbose, config).await
 }
 
 /// Core refresh logic, shared by `cmd_refresh` and `cmd_init --yes`.
-async fn run_refresh(project_root: &Path, force: bool, config: &GlobalConfig) -> Result<()> {
+async fn run_refresh(project_root: &Path, force: bool, verbose: bool, config: &GlobalConfig) -> Result<()> {
     use asp_llm::{LlmClient, OpenAiCompatClient, CompletionRequest, Message, Role};
 
     let db_path = project_db_path(&project_root.to_path_buf());
@@ -602,6 +609,11 @@ async fn run_refresh(project_root: &Path, force: bool, config: &GlobalConfig) ->
         .to_string_lossy()
         .into_owned();
 
+    if verbose {
+        println!("  endpoint: {}", config.llm.base_url);
+        println!("  model:    {}", config.llm.model);
+    }
+
     // Phase 1: build requests synchronously (DB access is not Send).
     let mut to_describe: Vec<(String, CompletionRequest)> = Vec::new();
     for component in &asp_config.component {
@@ -619,6 +631,12 @@ async fn run_refresh(project_root: &Path, force: bool, config: &GlobalConfig) ->
             }
         }
         let context = build_component_context(&db, &root_str, component)?;
+        if verbose {
+            println!("  [{}] context sent to LLM:", component.name);
+            for line in context.lines() {
+                println!("    {}", line);
+            }
+        }
         to_describe.push((component.name.clone(), CompletionRequest {
             messages: vec![
                 Message {
@@ -666,6 +684,9 @@ async fn run_refresh(project_root: &Path, force: bool, config: &GlobalConfig) ->
     for (name, result) in results {
         match result {
             Ok(rationale) => {
+                if verbose {
+                    println!("  [{}] raw response: {:?}", name, rationale.trim());
+                }
                 db.conn.execute(
                     "INSERT OR REPLACE INTO ai_metadata (component, rationale, generated_at, model) \
                      VALUES (?1, ?2, ?3, ?4)",
