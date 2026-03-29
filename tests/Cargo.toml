@@ -20,11 +20,16 @@ path = "rules_tests.rs"
 name = "indexer_tests"
 path = "indexer_tests.rs"
 
+[[test]]
+name = "self_analysis_tests"
+path = "self_analysis_tests.rs"
+
 [dev-dependencies]
 asp-core = { path = "../crates/asp-core" }
 asp-db = { path = "../crates/asp-db" }
 asp-parser = { path = "../crates/asp-parser" }
 asp-rules = { path = "../crates/asp-rules" }
 anyhow = { workspace = true }
+rusqlite = { workspace = true }
 
 [dependencies]
