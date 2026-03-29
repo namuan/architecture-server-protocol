@@ -42,32 +42,31 @@ mod tests {
     }
 
     // ---------------------------------------------------------------------------
-    // Test 1: Indexing the real ASP repo skips all Rust files
+    // Test 1: Indexing the real ASP repo indexes Rust files
     //
-    // ASP only understands Python/JS/TS. Running it over its own (Rust) workspace
-    // must complete without error and produce zero indexed files.
+    // ASP now parses Rust. Running it over its own workspace must complete without
+    // error and index all .rs source files with their use declarations and symbols.
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn test_index_real_asp_repo_skips_rust_files() {
+    fn test_index_real_asp_repo_indexes_rust_files() {
         let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
         let db = Database::open_in_memory().unwrap();
         let indexer = Indexer::new(db, repo_root.clone());
 
         indexer
             .index_directory(&repo_root)
-            .expect("index_directory must not fail on a Rust-only project");
+            .expect("index_directory must not fail on the ASP workspace");
 
-        // No Python/JS/TS sources in the ASP workspace → nothing indexed.
-        assert_eq!(
-            count_files(&indexer.db),
-            0,
-            "Rust files must be silently skipped, not indexed"
+        // The workspace has many .rs files — all should be indexed.
+        assert!(
+            count_files(&indexer.db) > 0,
+            "Rust files must be indexed now that the Rust parser is registered"
         );
-        assert_eq!(
-            count_imports(&indexer.db),
-            0,
-            "No imports should be recorded when no files are parsed"
+        // Every .rs file uses at least one `use` declaration.
+        assert!(
+            count_imports(&indexer.db) > 0,
+            "use declarations must be captured as imports"
         );
     }
 
