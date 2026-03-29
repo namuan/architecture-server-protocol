@@ -9,7 +9,15 @@
       "Bash(curl -s http://127.0.0.1:8080/v1/chat/completions -H \"Content-Type: application/json\" -d '{\"\"\"\"model\"\"\"\":\"\"\"\"google/gemini-3.1-flash-lite-preview\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"Reply with exactly: CURL_WORKS\"\"\"\"}],\"\"\"\"max_tokens\"\"\"\":10,\"\"\"\"stream\"\"\"\":false}')",
       "Bash(python3 -c \"import sys,json; r=json.load\\(sys.stdin\\); print\\(r[''''choices''''][0][''''message''''][''''content'''']\\)\")",
       "Bash(sqlite3 ~/.asp/3a3b0631f856.db \"DELETE FROM ai_metadata;\")",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(cargo add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)"
     ]
   }
 }
