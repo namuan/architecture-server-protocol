@@ -93,6 +93,9 @@ dependencies = [
  "asp-watcher",
  "clap",
  "futures",
+ "globset",
+ "ignore",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
@@ -189,6 +192,7 @@ dependencies = [
  "asp-db",
  "asp-parser",
  "asp-rules",
+ "rusqlite",
 ]
 
 [[package]]
